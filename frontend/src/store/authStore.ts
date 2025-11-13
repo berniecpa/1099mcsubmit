@@ -1,26 +1,36 @@
 import { create } from 'zustand';
-import { User } from '../lib/api';
+import { User } from 'firebase/auth';
+import { auth, onAuthChange } from '../lib/firebase';
 
 interface AuthState {
   user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  setAuth: (token: string, user: User) => void;
-  logout: () => void;
+  loading: boolean;
+  initialized: boolean;
+  setUser: (user: User | null) => void;
+  setLoading: (loading: boolean) => void;
+  initialize: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  loading: true,
+  initialized: false,
 
-  setAuth: (token: string, user: User) => {
-    localStorage.setItem('token', token);
-    set({ token, user, isAuthenticated: true });
+  setUser: (user: User | null) => {
+    set({ user, loading: false });
   },
 
-  logout: () => {
-    localStorage.removeItem('token');
-    set({ token: null, user: null, isAuthenticated: false });
+  setLoading: (loading: boolean) => {
+    set({ loading });
+  },
+
+  initialize: () => {
+    // Listen for auth state changes
+    onAuthChange((user) => {
+      set({ user, loading: false, initialized: true });
+    });
   }
 }));
+
+// Initialize auth listener when the app starts
+useAuthStore.getState().initialize();

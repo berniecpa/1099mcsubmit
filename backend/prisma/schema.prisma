@@ -9,14 +9,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PROFESSIONAL
+  BUSINESS
+}
 
-  business  Business?
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  firebaseUid  String   @unique  // Firebase Authentication UID
+  email        String   @unique
+  displayName  String?
+  photoURL     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business     Business?
+  subscription Subscription?
 }
 
 model Business {
@@ -145,4 +163,33 @@ model Form1099 {
   @@index([recipientId])
   @@index([taxYear])
   @@index([status])
+}
+
+model Subscription {
+  id                    String             @id @default(uuid())
+  userId                String             @unique
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Subscription Details
+  tier                  SubscriptionTier   @default(FREE)
+  status                SubscriptionStatus @default(ACTIVE)
+
+  // Stripe Integration
+  stripeCustomerId      String?            @unique
+  stripeSubscriptionId  String?            @unique
+  stripePriceId         String?
+  stripeCurrentPeriodEnd DateTime?
+
+  // Usage Tracking
+  formsUsedThisYear     Int                @default(0)
+  yearlyResetDate       DateTime?
+
+  // Trial
+  trialEndsAt           DateTime?
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([stripeCustomerId])
 }

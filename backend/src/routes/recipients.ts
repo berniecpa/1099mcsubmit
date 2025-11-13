@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { body, validationResult } from 'express-validator';
-import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { authenticate, AuthRequest } from '../middleware/firebaseAuth.js';
 import { AppError } from '../middleware/errorHandler.js';
 
 const router = Router();

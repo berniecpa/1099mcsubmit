@@ -1,12 +1,13 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { logout as firebaseLogout } from '../lib/firebase';
 
 export default function Layout() {
-  const { user, logout } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await firebaseLogout();
     navigate('/login');
   };
 
@@ -41,9 +42,9 @@ export default function Layout() {
               </div>
             </div>
             <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <span className="text-sm text-gray-700 mr-4">
-                  {user?.business?.businessName || user?.email}
+              <div className="flex-shrink-0 flex items-center gap-4">
+                <span className="text-sm text-gray-700">
+                  {user?.displayName || user?.email}
                 </span>
                 <button
                   onClick={handleLogout}

@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { PrismaClient, FilingStatus } from '@prisma/client';
 import { body, validationResult } from 'express-validator';
-import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { authenticate, AuthRequest } from '../middleware/firebaseAuth.js';
+import { checkSubscriptionLimit } from '../middleware/subscription.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { taxbanditsService } from '../services/taxbandits.js';
+import { stripeService } from '../services/stripe.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -223,7 +225,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res, next) => {
 });
 
 // Submit form to IRS via TaxBandits
-router.post('/:id/submit', authenticate, async (req: AuthRequest, res, next) => {
+router.post('/:id/submit', authenticate, checkSubscriptionLimit, async (req: AuthRequest, res, next) => {
   try {
     const business = await prisma.business.findUnique({
       where: { userId: req.userId }
@@ -290,6 +292,11 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res, next) => 
           recipient: true
         }
       });
+
+      // Increment usage count
+      if (req.userId) {
+        await stripeService.incrementFormUsage(req.userId);
+      }
 
       res.json(updatedForm);
     } catch (error) {
