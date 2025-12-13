@@ -1,0 +1,195 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PROFESSIONAL
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  firebaseUid  String   @unique  // Firebase Authentication UID
+  email        String   @unique
+  displayName  String?
+  photoURL     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business     Business?
+  subscription Subscription?
+}
+
+model Business {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Business Information
+  businessName    String
+  ein             String   // Employer Identification Number
+  tradeName       String?
+
+  // Address
+  address         String
+  city            String
+  state           String
+  zipCode         String
+
+  // Contact
+  contactName     String
+  phone           String
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  recipients      Recipient[]
+  forms1099       Form1099[]
+}
+
+model Recipient {
+  id              String   @id @default(uuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  // Recipient Information (from W-9)
+  name            String
+  businessName    String?
+  tin             String   // Taxpayer Identification Number (SSN or EIN)
+  tinType         String   // "SSN" or "EIN"
+
+  // Address
+  address         String
+  city            String
+  state           String
+  zipCode         String
+
+  // Contact
+  email           String?
+  phone           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  forms1099       Form1099[]
+
+  @@index([businessId])
+}
+
+enum FormType {
+  NEC   // Non-Employee Compensation
+  MISC  // Miscellaneous Income
+  K     // Payment Card and Third Party Network Transactions
+}
+
+enum FilingStatus {
+  DRAFT
+  PENDING
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  CORRECTED
+}
+
+model Form1099 {
+  id              String       @id @default(uuid())
+  businessId      String
+  business        Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  recipientId     String
+  recipient       Recipient    @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  // Form Details
+  formType        FormType
+  taxYear         Int
+
+  // Amounts (stored in cents to avoid floating point issues)
+  // For 1099-NEC
+  nonemployeeCompensation Int?  // Box 1
+
+  // For 1099-MISC
+  rents                   Int?  // Box 1
+  royalties               Int?  // Box 2
+  otherIncome             Int?  // Box 3
+  federalIncomeTaxWithheld Int? // Box 4
+  fishingBoatProceeds     Int?  // Box 5
+  medicalHealthcare       Int?  // Box 6
+  substitutePayments      Int?  // Box 8
+  cropInsurance           Int?  // Box 9
+  grossProceeds           Int?  // Box 10
+  fishPurchased           Int?  // Box 11
+  section409ADeferrals    Int?  // Box 12
+  excessGoldenParachute   Int?  // Box 13
+  nonqualifiedDeferredComp Int? // Box 14
+  stateTaxWithheld        Int?  // Box 16
+
+  // For 1099-K
+  grossAmount             Int?  // Box 1a
+  cardNotPresent          Int?  // Box 1b
+  merchantCategoryCode    String? // Box 2
+  numberOfTransactions    Int?  // Box 3
+
+  // TaxBandits tracking
+  taxbanditsSubmissionId  String?  @unique
+  taxbanditsRecordId      String?
+
+  // Filing status
+  status          FilingStatus @default(DRAFT)
+  errorMessage    String?
+
+  submittedAt     DateTime?
+  acceptedAt      DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([recipientId])
+  @@index([taxYear])
+  @@index([status])
+}
+
+model Subscription {
+  id                    String             @id @default(uuid())
+  userId                String             @unique
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Subscription Details
+  tier                  SubscriptionTier   @default(FREE)
+  status                SubscriptionStatus @default(ACTIVE)
+
+  // Stripe Integration
+  stripeCustomerId      String?            @unique
+  stripeSubscriptionId  String?            @unique
+  stripePriceId         String?
+  stripeCurrentPeriodEnd DateTime?
+
+  // Usage Tracking
+  formsUsedThisYear     Int                @default(0)
+  yearlyResetDate       DateTime?
+
+  // Trial
+  trialEndsAt           DateTime?
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+}
